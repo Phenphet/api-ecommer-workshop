@@ -66,11 +66,11 @@ app.put('/update', async (req, res) => {
 
         const imagePath = './uploads/' + oldData.img
 
-        if (oldData.img){
-            if(fs.existsSync(imagePath)){
+        if (oldData.img) {
+            if (fs.existsSync(imagePath)) {
                 await fs.unlinkSync(imagePath)
             }
-        
+
         }
 
         await prisma.product.update({
@@ -79,7 +79,7 @@ app.put('/update', async (req, res) => {
                 id: parseInt(req.body.id)
             }
         })
-       
+
         res.send({ message: 'success' })
     } catch (e) {
         res.status(500).send({ error: e.message })
@@ -121,37 +121,47 @@ app.post('/upload', async (req, res) => {
 app.post('/uploadFromExcel', (req, res) => {
     try {
         const fileExcel = req.files.fileExcel
+        if (fileExcel != undefined) {
+            if (fileExcel != null) {
+                fileExcel.mv('./uploads/' + fileExcel.name, async (err) => {
+                    if (err) throw err
+                    const workbook = new exclejs.Workbook()
+                    await workbook.xlsx.readFile('./uploads/' + fileExcel.name)
 
-        fileExcel.mv('./uploads/' + fileExcel.name, async (err) => {
-            if (err) throw err
-            const workbook = new exclejs.Workbook()
-            await workbook.xlsx.readFile('./uploads/' + fileExcel.name)
+                    const ws = workbook.getWorksheet(1)
 
-            const ws = workbook.getWorksheet(1)
+                    for (let i = 2; i <= ws.rowCount; i++) {
+                        const name = ws.getRow(i).getCell(1).value ?? ''
+                        const cost = ws.getRow(i).getCell(2).value ?? 0
+                        const price = ws.getRow(i).getCell(3).value ?? 0
 
-            for (let i = 2; i <= ws.rowCount; i++) {
-                const name = ws.getRow(i).getCell(1).value ?? ''
-                const cost = ws.getRow(i).getCell(2).value ?? 0
-                const price = ws.getRow(i).getCell(3).value ?? 0
-
-                if (name != '' && cost >= 0 && price >= 0) {
-                    await prisma.product.create({
-                        data: {
-                            name: name,
-                            cost: cost,
-                            price: price,
-                            img: ''
+                        if (name != '' && cost >= 0 && price >= 0) {
+                            await prisma.product.create({
+                                data: {
+                                    name: name,
+                                    cost: cost,
+                                    price: price,
+                                    img: ''
+                                }
+                            })
                         }
-                    })
-                }
 
+                    }
+
+                    const fs = require('fs')
+                    await fs.unlinkSync('./uploads/' + fileExcel.name)
+
+                    res.send({ message: 'success' })
+                })
+            } else {
+                res.status(500).send({ message: 'fileExcel is null' })
             }
+        } else {
+            res.status(500).send({ message: 'fileExcel is undefined' })
+        }
 
-            const fs = require('fs')
-            await fs.unlinkSync('./uploads/' + fileExcel.name)
 
-            res.send({ message: 'success' })
-        })
+
     } catch (e) {
         res.status(500).send({ error: e.message })
     }
